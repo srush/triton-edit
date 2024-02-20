@@ -662,7 +662,7 @@ unsigned ReduceOp::getNumOperands() { return this->getOperands().size(); }
 
 //-- ScanOp --
 void ScanOp::build(mlir::OpBuilder &builder, mlir::OperationState &state,
-                   mlir::ValueRange operands, int axis) {
+                   mlir::ValueRange operands, int axis, bool reverse) {
   SmallVector<Type> inferredReturnTypes;
   for (auto arg : operands)
     inferredReturnTypes.push_back(arg.getType());

@@ -1450,8 +1450,8 @@ void init_triton_ir(py::module &&m) {
            })
       .def("create_scan",
            [](TritonOpBuilder &self, std::vector<mlir::Value> operands,
-              int axis) -> mlir::OpState {
-             return self.create<mlir::triton::ScanOp>(operands, axis);
+              int axis, bool reverse) -> mlir::OpState {
+             return self.create<mlir::triton::ScanOp>(operands, axis, reverse);
            })
       .def("create_scan_ret",
            [](TritonOpBuilder &self, py::args args) -> mlir::OpState {

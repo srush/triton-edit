@@ -56,7 +56,14 @@ scanThreadContiguousElements(SmallVector<SmallVector<Value>> &srcValues,
   unsigned numChunks = srcValues.size() / scanElementsPerThreads;
   unsigned stride = helper.getAxisElementStride();
   SmallVector<SmallVector<Value>> accs(numChunks);
-  for (unsigned srcIndex = 0; srcIndex < srcValues.size(); srcIndex++) {
+
+
+  for (unsigned index = 0; index < srcValues.size(); index++) {
+    unsigned srcIndex = index;
+    if (helper.getReverse()) {
+        srcIndex = srcValues.size() - index - 1;
+    }
+
     // Change this into emitOffsetForLayout?
     unsigned accIndex = (srcIndex % stride) +
                         ((srcIndex / stride) / scanElementsPerThreads) * stride;
@@ -77,7 +84,12 @@ static void warpScan(SmallVector<SmallVector<Value>> &srcValues,
   unsigned elementStride = helper.getAxisElementStride();
   unsigned threadStride = helper.getAxisThreadStride();
   unsigned scanDim = helper.getAxisNumThreadsPerWarpWithUniqueData();
-  for (unsigned srcIndex = 0; srcIndex < srcValues.size(); srcIndex++) {
+  for (unsigned index = 0; index < srcValues.size(); index++) {
+    unsigned srcIndex = index;
+    if (helper.getReverse()) {
+        srcIndex = srcValues.size() - index - 1;
+    }
+
     unsigned elementIdx = (srcIndex / elementStride) % scanElementsPerThreads;
     // Only consider the last element of each contiguous chunk of elements.
     if (elementIdx != scanElementsPerThreads - 1)
@@ -119,7 +131,12 @@ static void storeWarpAccumulator(SmallVector<SmallVector<Value>> &srcValues,
   unsigned axisNumWarps = helper.getAxisNumWarpsWithUniqueData();
   unsigned chunkId = 0;
   unsigned elementStride = helper.getAxisElementStride();
-  for (unsigned srcIndex = 0; srcIndex < srcValues.size(); srcIndex++) {
+  for (unsigned outerIndex = 0; outerIndex < srcValues.size(); outerIndex++) {
+    unsigned srcIndex = outerIndex;
+    if (helper.getReverse()) {
+        srcIndex = srcValues.size() - outerIndex - 1;
+    }
+
     unsigned elementIdx = (srcIndex / elementStride) % scanElementsPerThreads;
     // Only consider the last element of each contiguous chunk of elements.
     if (elementIdx != scanElementsPerThreads - 1)
@@ -172,7 +189,12 @@ static void AddPartialReduce(SmallVector<SmallVector<Value>> &srcValues,
                                         parallelElementsPerThread);
   unsigned chunkId = 0;
   unsigned blockStride = helper.getAxisBlockStride();
-  for (unsigned srcIndex = 0; srcIndex < srcValues.size(); srcIndex++) {
+  for (unsigned index = 0; index < srcValues.size(); index++) {
+    unsigned srcIndex = index;
+    if (helper.getReverse()) {
+        srcIndex = srcValues.size() - index - 1;
+    }
+
     unsigned elementIdx = (srcIndex / elementStride) % scanElementsPerThreads;
     // Only consider the last element of each contiguous chunk of elements.
     if (elementIdx != scanElementsPerThreads - 1)
@@ -275,7 +297,12 @@ static void AddPartialReduceOneWarp(SmallVector<SmallVector<Value>> &srcValues,
                                                parallelElementsPerThread);
   unsigned chunkId = 0;
   unsigned blockStride = helper.getAxisBlockStride();
-  for (unsigned srcIndex = 0; srcIndex < srcValues.size(); srcIndex++) {
+  for (unsigned index = 0; index < srcValues.size(); index++) {
+    unsigned srcIndex = index;
+    if (helper.getReverse()) {
+        srcIndex = srcValues.size() - index - 1;
+    }
+
     unsigned elementIdx = (srcIndex / elementStride) % scanElementsPerThreads;
     // Only consider the last element of each contiguous chunk of elements.
     if (elementIdx != scanElementsPerThreads - 1)
