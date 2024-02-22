@@ -666,6 +666,8 @@ void ScanOp::build(mlir::OpBuilder &builder, mlir::OperationState &state,
   SmallVector<Type> inferredReturnTypes;
   for (auto arg : operands)
     inferredReturnTypes.push_back(arg.getType());
+  state.addAttribute("reverse", builder.getBoolAttr(reverse));
+
   ReduceOp::build(builder, state, inferredReturnTypes, operands, axis);
 }
 

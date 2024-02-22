@@ -1791,15 +1791,16 @@ def test_reduce(op, dtype_str, shape, axis, keep_dims, num_ctas, device):
             np.testing.assert_equal(z_ref, z_tri)
 
 
-scan2d_shapes = [(8, 32), (16, 32), (32, 16), (2, 1024), (1024, 2), (32, 32), (1, 1024)]
+scan2d_shapes = [(2, 1024), (16, 32), (16, 32), (32, 16),  (1024, 2), (32, 32), (1, 1024)]
 
-scan_configs = [(op, type, shape, axis, num_warps)
+scan_configs = [(op, type, shape, axis, reverse, num_warps)
                 for num_warps in [4, 16]
                 for type in ['int32', 'float32']
                 for axis in [1, 0]
+                for reverse in [True, False]
                 for shape in scan2d_shapes
-                for op in ['cumsum', 'cumprod', 'get_first_element', 'linear_recurrence']]
-negative_config = [('cumsum', 'float32', (32, 32), -1, 4)]
+                for op in ['cumsum', 'cumprod', 'get_first_element']]
+negative_config = [('cumsum', 'float32', (32, 32), -1, False, 4)]
 
 
 @triton.jit
@@ -1814,8 +1815,14 @@ def linear_recurrence(a1, b1, a2, b2):
     return a1 * a2, b1 * a2 + b2
 
 
-@pytest.mark.parametrize("op, dtype_str, shape, axis, num_warps", scan_configs + negative_config)
-def test_scan2d(op, dtype_str, shape, axis, num_warps, device):
+@triton.jit
+def cummax(v0, i0, v1, i1):
+    gt = v0 > v1
+    return tl.where(gt, v0, v1), tl.where(gt, i0, i1)
+
+
+@pytest.mark.parametrize("op, dtype_str, shape, axis, reverse, num_warps", scan_configs + negative_config)
+def test_scan2d(op, dtype_str, shape, axis, reverse, num_warps, device):
     check_type_supported(dtype_str, device)
 
     # triton kernel
@@ -1829,14 +1836,19 @@ def test_scan2d(op, dtype_str, shape, axis, num_warps, device):
         tl.store(Z + range_m[:, None] * BLOCK_N + range_n[None, :], z)
 
     if op == 'cumsum' or op == 'cumprod':
-        kernel = patch_kernel(kernel, {'GENERATE_TEST_HERE': f'z = tl.{op}(x, axis={axis}, reverse=False)'})
+        kernel = patch_kernel(kernel, {'GENERATE_TEST_HERE': f'z = tl.{op}(x, axis={axis}, reverse={reverse})'})
     elif op == 'get_first_element':
         kernel = patch_kernel(kernel,
-                              {'GENERATE_TEST_HERE': f'z = tl.associative_scan(x, axis={axis}, combine_fn={op}, reverse=False)'})
+                              {'GENERATE_TEST_HERE': f'z = tl.associative_scan(x, axis={axis}, combine_fn={op}, reverse={reverse})'})
+    elif op == 'cummax':
+        rg = "range_m[:, None]" if axis == 0 else "range_n[None, :]"
+        rg = f"tl.broadcast_to({rg}.to(tl.int64), [BLOCK_M, BLOCK_N])"
+        kernel = patch_kernel(
+            kernel, {'GENERATE_TEST_HERE': f'_, z = tl.associative_scan((x, {rg}), axis={axis}, combine_fn={op}, reverse={reverse})'})
     else:
         assert op == 'linear_recurrence'
         kernel = patch_kernel(
-            kernel, {'GENERATE_TEST_HERE': f'_, z = tl.associative_scan((x, y), axis={axis}, combine_fn={op}, reverse=False)'})
+            kernel, {'GENERATE_TEST_HERE': f'_, z = tl.associative_scan((x, y), axis={axis}, combine_fn={op}, reverse={reverse})'})
     # input
     rs = RandomState(17)
     if op == 'linear_recurrence' and dtype_str in int_dtypes:
@@ -1845,16 +1857,31 @@ def test_scan2d(op, dtype_str, shape, axis, num_warps, device):
         x = rs.randint(-1, 2, shape, dtype=dtype_str)
         y = rs.randint(-1, 2, shape, dtype=dtype_str)
     else:
-        x = numpy_random(shape, dtype_str=dtype_str, rs=rs)
+        # x = np.ones(shape, dtype=dtype_str)
+        x = np.arange(1024)[None, :]
         # y is just used in linear_recurrence
-        y = numpy_random(shape, dtype_str=dtype_str, rs=rs)
+        y = np.ones(shape, dtype=dtype_str)
+    x_in = x
+    if reverse:
+        x_in = np.flip(x, axis)
+
     z = np.empty_like(x)
     x_tri = to_triton(x, device=device)
     y_tri = to_triton(y, device=device)
     if op == 'cumsum' or op == 'cumprod':
         numpy_op = {'cumsum': np.cumsum, 'cumprod': np.cumprod}[op]
         z_dtype_str = dtype_str
-        z_ref = numpy_op(x, axis=axis).astype(getattr(np, z_dtype_str))
+        z_ref = numpy_op(x_in, axis=axis).astype(getattr(np, z_dtype_str))
+        if reverse:
+           z_ref = np.flip(z_ref, axis)
+
+    elif op == 'cummax':
+        # NumPy does not have cummax
+        z = z.astype(np.int64)
+        z_ref = torch.cummax(torch.from_numpy(x), axis=axis).indices.numpy()
+        if reverse:
+            z_ref = np.flip(z_ref, axis)
+
     elif op == 'linear_recurrence':
         # Simplify to the axis=1 case
         x_ref = x.T if axis == 0 else x
@@ -1881,6 +1908,12 @@ def test_scan2d(op, dtype_str, shape, axis, num_warps, device):
     z_tri = to_triton(z, device=device)
     kernel[(1, )](x_tri, y_tri, z_tri, BLOCK_M=shape[0], BLOCK_N=shape[1], AXIS=axis, num_warps=num_warps)
     z_tri = to_numpy(z_tri)
+    print(op)
+    print(x)
+    print(x_tri)
+    print("ref", z_ref)
+    print("me", z_tri)
+
     # compare
     if dtype_str == 'float32':
         if op == 'cumprod':

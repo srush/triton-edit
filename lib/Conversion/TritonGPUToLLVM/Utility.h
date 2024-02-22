@@ -349,6 +349,8 @@ Value shflSync(Location loc, ConversionPatternRewriter &rewriter, Value val,
                int i);
 Value shflUpSync(Location loc, ConversionPatternRewriter &rewriter, Value val,
                  int i);
+Value shflDownSync(Location loc, ConversionPatternRewriter &rewriter, Value val,
+                 int i);
 Value shflIdxSync(Location loc, ConversionPatternRewriter &rewriter, Value val,
                   int i);
 Value shflIdxSync(Location loc, ConversionPatternRewriter &rewriter, Value val,

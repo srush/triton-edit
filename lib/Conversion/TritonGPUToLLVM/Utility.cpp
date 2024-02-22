@@ -323,6 +323,13 @@ Value shflUpSync(Location loc, ConversionPatternRewriter &rewriter, Value val,
                         i32_val(0x0));
 }
 
+Value shflDownSync(Location loc, ConversionPatternRewriter &rewriter, Value val,
+                 int i) {
+  return commonShflSync(loc, rewriter, val, i32_val(i), NVVM::ShflKind::down,
+                        i32_val(0x1f));
+}
+
+    
 Value shflIdxSync(Location loc, ConversionPatternRewriter &rewriter, Value val,
                   int i) {
   return shflIdxSync(loc, rewriter, val, i32_val(i));

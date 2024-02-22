@@ -532,7 +532,6 @@ def TT_ReduceReturnOp: TT_Op<"reduce.return",
 def TT_ScanOp: TT_Op<"scan",
                        [Pure,
                         SameOperandsAndResultEncoding,
-                        SameOperandsAndResultElementType,
                         SingleBlock,
                         DeclareOpInterfaceMethods<InferTypeOpInterface>]> {
     let summary = "Associative scan using generic combination algorithm";
