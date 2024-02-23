@@ -1981,8 +1981,6 @@ def test_scan2d(op, dtype_str, shape, axis, reverse, num_warps, device):
     # triton result
     z_tri = to_triton(z, device=device)
     kernel[(1, )](x_tri, y_tri, z_tri, BLOCK_M=shape[0], BLOCK_N=shape[1], AXIS=axis, num_warps=num_warps)
-    print(z_ref)
-    print(z_tri)
 
     z_tri = to_numpy(z_tri)
     # compare

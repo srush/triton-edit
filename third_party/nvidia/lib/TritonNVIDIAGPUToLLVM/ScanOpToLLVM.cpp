@@ -33,8 +33,8 @@ static SmallVector<Value> accumulate(ConversionPatternRewriter &rewriter,
 
   SmallVector<Value> combineArgs(2 * acc.size());
   for (unsigned i = 0; i < acc.size(); ++i) {
-      combineArgs[i] = acc[i];
-      combineArgs[acc.size() + i] = cur[i];
+    combineArgs[i] = acc[i];
+    combineArgs[acc.size() + i] = cur[i];
   }
 
   rewriter.inlineBlockBefore(&newScan, &*rewriter.getInsertionPoint(),
@@ -130,7 +130,6 @@ static void storeWarpAccumulator(SmallVector<SmallVector<Value>> &srcValues,
     Value mask = icmp_eq(laneId, i32_val(scanDim - 1));
     Value index = add(parallelLaneId, mul(warpId, i32_val(numParallelLane)));
     index = add(index, i32_val(chunkId * numParallelLane * axisNumWarps));
-    
     for (unsigned i = 0; i < lastElement.size(); ++i) {
       Value writePtr = gep(ptr_ty(rewriter.getContext(), 3), smemTypes[i],
                            smemBases[i], index);
@@ -174,7 +173,6 @@ static void AddPartialReduce(SmallVector<SmallVector<Value>> &srcValues,
                                         parallelElementsPerThread);
   unsigned chunkId = 0;
   unsigned blockStride = helper.getAxisBlockStride();
-
   for (unsigned srcIndex = 0; srcIndex < srcValues.size(); srcIndex++) {
     unsigned elementIdx = (srcIndex / elementStride) % scanElementsPerThreads;
     // Only consider the last element of each contiguous chunk of elements.
@@ -526,7 +524,6 @@ ScanOpConversion::emitFastScan(triton::ScanOp op, triton::ScanOpAdaptor adaptor,
     AddPartialReduceOneWarp(srcValues, rewriter, helper, warpIdAxis, laneIdAxis,
                             laneIdLast);
   } // else axisNumWarps == 1 and srcValues.size() == 1, nothing to do.
-
   
   auto transpose = [](const SmallVector<SmallVector<Value>> &v) {
     assert(v.size() > 0 && v[0].size() > 0);
