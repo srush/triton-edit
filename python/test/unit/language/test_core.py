@@ -1856,7 +1856,7 @@ scan_configs = [(op, type, shape, axis, reverse, num_warps)
                 for axis in [1, 0]
                 for reverse in [True, False]
                 for shape in scan2d_shapes
-                for op in ['cumsum', 'cumprod', 'cummax', 'get_first_element']]
+                for op in ['cumsum', 'cumprod', 'linear_recurrence', 'cummax', 'get_first_element']]
 negative_config = [('cumsum', 'float32', (32, 32), -1, False, 4)]
 
 
@@ -1889,7 +1889,7 @@ def test_scan2d(op, dtype_str, shape, axis, reverse, num_warps, device):
         range_n = tl.arange(0, BLOCK_N)
         x = tl.load(X + range_m[:, None] * BLOCK_N + range_n[None, :])
         y = tl.load(Y + range_m[:, None] * BLOCK_N + range_n[None, :])
-        GENERATE_TEST_HERE
+        GENERATE_TEST_HERE 
         tl.store(Z + range_m[:, None] * BLOCK_N + range_n[None, :], z)
 
     if op == 'cumsum' or op == 'cumprod':
@@ -1933,10 +1933,9 @@ def test_scan2d(op, dtype_str, shape, axis, reverse, num_warps, device):
     elif op == 'cummax':
         # NumPy does not have cummax
         z = z.astype(np.int64)
-        
         z_ref = torch.cummax(torch.from_numpy(x_in.copy()), axis=axis).indices.numpy()
         if reverse:
-           z_ref = np.flip(z_ref, axis)
+           z_ref = x_in.shape[axis] - np.flip(z_ref, axis) - 1
 
     elif op == 'linear_recurrence':
         # Simplify to the axis=1 case
