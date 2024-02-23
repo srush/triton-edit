@@ -8,6 +8,7 @@ using namespace mlir::triton;
 using ::mlir::LLVM::delinearize;
 using ::mlir::LLVM::linearize;
 using ::mlir::LLVM::shflIdxSync;
+using ::mlir::LLVM::shflSync;
 using ::mlir::LLVM::shflUpSync;
 using ::mlir::LLVM::NVIDIA::storeShared;
 using ::mlir::triton::gpu::getTotalElemsPerThread;
@@ -119,6 +120,7 @@ static void storeWarpAccumulator(SmallVector<SmallVector<Value>> &srcValues,
   unsigned axisNumWarps = helper.getAxisNumWarpsWithUniqueData();
   unsigned chunkId = 0;
   unsigned elementStride = helper.getAxisElementStride();
+
   for (unsigned srcIndex = 0; srcIndex < srcValues.size(); srcIndex++) {
     unsigned elementIdx = (srcIndex / elementStride) % scanElementsPerThreads;
     // Only consider the last element of each contiguous chunk of elements.
@@ -128,7 +130,7 @@ static void storeWarpAccumulator(SmallVector<SmallVector<Value>> &srcValues,
     Value mask = icmp_eq(laneId, i32_val(scanDim - 1));
     Value index = add(parallelLaneId, mul(warpId, i32_val(numParallelLane)));
     index = add(index, i32_val(chunkId * numParallelLane * axisNumWarps));
-
+    
     for (unsigned i = 0; i < lastElement.size(); ++i) {
       Value writePtr = gep(ptr_ty(rewriter.getContext(), 3), smemTypes[i],
                            smemBases[i], index);
@@ -172,6 +174,7 @@ static void AddPartialReduce(SmallVector<SmallVector<Value>> &srcValues,
                                         parallelElementsPerThread);
   unsigned chunkId = 0;
   unsigned blockStride = helper.getAxisBlockStride();
+
   for (unsigned srcIndex = 0; srcIndex < srcValues.size(); srcIndex++) {
     unsigned elementIdx = (srcIndex / elementStride) % scanElementsPerThreads;
     // Only consider the last element of each contiguous chunk of elements.
@@ -439,6 +442,25 @@ unpackInputs(Location loc, triton::ScanOp op, triton::ScanOpAdaptor adaptor,
   return srcValues;
 }
 
+SmallVector<SmallVector<Value>> 
+flipSrcValues(Location loc, triton::ScanOp op, 
+                   ConversionPatternRewriter &rewriter,
+                   SmallVector<SmallVector<Value>> srcValues,
+                   int iWarpSize){
+    SmallVector<SmallVector<Value>> values(srcValues.size());
+    for (int i = 0; i < srcValues.size(); ++i) {
+        for (unsigned j = 0; j < op.getNumOperands(); ++j) {
+            for (unsigned k = iWarpSize / 2; k >= 1; k = k / 2){
+                auto value = shflSync(loc, rewriter, srcValues[srcValues.size() - i - 1][j], k);
+                srcValues[srcValues.size() - i - 1][j] = value;
+            }
+            values[i].push_back(srcValues[srcValues.size() - i - 1][j]);
+        }
+    }
+    return values;
+}
+
+    
 // Lowering using warp shuffle operations to do warp level scan.
 LogicalResult
 ScanOpConversion::emitFastScan(triton::ScanOp op, triton::ScanOpAdaptor adaptor,
@@ -458,9 +480,14 @@ ScanOpConversion::emitFastScan(triton::ScanOp op, triton::ScanOpAdaptor adaptor,
   auto [laneIdAxis, warpIdAxis, flatIdParallel] =
       getDelinearizedIds(rewriter, helper, laneId, warpId);
   auto axisNumWarps = helper.getAxisNumWarpsWithUniqueData();
-  warpIdAxis = urem(warpIdAxis, i32_val(axisNumWarps));
+
   auto srcValues =
       unpackInputs(loc, op, adaptor, rewriter, *getTypeConverter());
+
+  if (op.getReverse()) {
+      warpIdAxis = sub(i32_val(axisNumWarps-1), urem(warpIdAxis, i32_val(axisNumWarps)));
+      srcValues = flipSrcValues(loc, op, rewriter, srcValues, iWarpSize);
+  }
 
   // Scan contiguous elements in a thread and update `srcValues`.
   scanThreadContiguousElements(srcValues, rewriter, helper);
@@ -500,6 +527,7 @@ ScanOpConversion::emitFastScan(triton::ScanOp op, triton::ScanOpAdaptor adaptor,
                             laneIdLast);
   } // else axisNumWarps == 1 and srcValues.size() == 1, nothing to do.
 
+  
   auto transpose = [](const SmallVector<SmallVector<Value>> &v) {
     assert(v.size() > 0 && v[0].size() > 0);
     auto ret = SmallVector<SmallVector<Value>>(v[0].size(),
@@ -513,6 +541,10 @@ ScanOpConversion::emitFastScan(triton::ScanOp op, triton::ScanOpAdaptor adaptor,
   };
 
   SmallVector<Value> results(op.getNumOperands());
+  if (op.getReverse()) {
+      srcValues = flipSrcValues(loc, op, rewriter, srcValues, iWarpSize);
+  }
+
   auto valuesTransposed = transpose(srcValues);
   for (unsigned i = 0; i < op.getNumOperands(); ++i) {
     auto resultTy = op.getResult()[i].getType().dyn_cast<RankedTensorType>();

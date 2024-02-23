@@ -1854,7 +1854,7 @@ scan_configs = [(op, type, shape, axis, reverse, num_warps)
                 for num_warps in [4, 16]
                 for type in ['int32', 'float32']
                 for axis in [1, 0]
-                for reverse in [False, True]
+                for reverse in [True, False]
                 for shape in scan2d_shapes
                 for op in ['cumsum', 'cumprod', 'get_first_element', 'linear_recurrence', 'cummax']]
 negative_config = [('cumsum', 'float32', (32, 32), -1, False, 4)]
@@ -1893,7 +1893,7 @@ def test_scan2d(op, dtype_str, shape, axis, reverse, num_warps, device):
         tl.store(Z + range_m[:, None] * BLOCK_N + range_n[None, :], z)
 
     if op == 'cumsum' or op == 'cumprod':
-        kernel = patch_kernel(kernel, {'GENERATE_TEST_HERE': f'z = tl.{op}(x, axis={axis})'})
+        kernel = patch_kernel(kernel, {'GENERATE_TEST_HERE': f'z = tl.{op}(x, axis={axis}, reverse={reverse})'})
     elif op == 'get_first_element':
         kernel = patch_kernel(kernel,
                               {'GENERATE_TEST_HERE': f'z = tl.associative_scan(x, axis={axis}, combine_fn={op}, reverse={reverse})'})
@@ -1956,12 +1956,20 @@ def test_scan2d(op, dtype_str, shape, axis, reverse, num_warps, device):
         assert op == 'get_first_element'
         z_ref = x
         if axis == 0:
-            z_ref[1:] = x[0]
+            if reverse:
+                z_ref[:-1] = x[-1]
+            else:
+                z_ref[1:] = x[0]
         else:
-            z_ref[:, 1:] = x[:, 0:1]
+            if reverse:
+                z_ref[:, :-1] = x[:, -1:]
+            else:
+                z_ref[:, 1:] = x[:, 0:1]
+
     # triton result
     z_tri = to_triton(z, device=device)
     kernel[(1, )](x_tri, y_tri, z_tri, BLOCK_M=shape[0], BLOCK_N=shape[1], AXIS=axis, num_warps=num_warps)
+    print(z_tri[0, :512])
     z_tri = to_numpy(z_tri)
     # compare
     if dtype_str == 'float32':
