@@ -33,8 +33,8 @@ static SmallVector<Value> accumulate(ConversionPatternRewriter &rewriter,
 
   SmallVector<Value> combineArgs(2 * acc.size());
   for (unsigned i = 0; i < acc.size(); ++i) {
-    combineArgs[i] = acc[i];
-    combineArgs[acc.size() + i] = cur[i];
+      combineArgs[i] = acc[i];
+      combineArgs[acc.size() + i] = cur[i];
   }
 
   rewriter.inlineBlockBefore(&newScan, &*rewriter.getInsertionPoint(),
@@ -480,12 +480,12 @@ ScanOpConversion::emitFastScan(triton::ScanOp op, triton::ScanOpAdaptor adaptor,
   auto [laneIdAxis, warpIdAxis, flatIdParallel] =
       getDelinearizedIds(rewriter, helper, laneId, warpId);
   auto axisNumWarps = helper.getAxisNumWarpsWithUniqueData();
-
+  warpIdAxis = urem(warpIdAxis, i32_val(axisNumWarps));
   auto srcValues =
       unpackInputs(loc, op, adaptor, rewriter, *getTypeConverter());
 
   if (op.getReverse()) {
-      warpIdAxis = sub(i32_val(axisNumWarps-1), urem(warpIdAxis, i32_val(axisNumWarps)));
+      warpIdAxis = sub(i32_val(axisNumWarps-1), warpIdAxis);
       srcValues = flipSrcValues(loc, op, rewriter, srcValues, iWarpSize);
   }
 

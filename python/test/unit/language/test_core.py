@@ -1856,7 +1856,7 @@ scan_configs = [(op, type, shape, axis, reverse, num_warps)
                 for axis in [1, 0]
                 for reverse in [True, False]
                 for shape in scan2d_shapes
-                for op in ['cumsum', 'cumprod', 'get_first_element', 'cummax']]
+                for op in ['cumsum', 'cumprod', 'cummax', 'get_first_element']]
 negative_config = [('cumsum', 'float32', (32, 32), -1, False, 4)]
 
 
@@ -1977,7 +1977,9 @@ def test_scan2d(op, dtype_str, shape, axis, reverse, num_warps, device):
     # triton result
     z_tri = to_triton(z, device=device)
     kernel[(1, )](x_tri, y_tri, z_tri, BLOCK_M=shape[0], BLOCK_N=shape[1], AXIS=axis, num_warps=num_warps)
-    print(z_tri[0, :512])
+    print(z_ref)
+    print(z_tri)
+    
     z_tri = to_numpy(z_tri)
     # compare
     if dtype_str == 'float32':
