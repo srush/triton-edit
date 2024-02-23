@@ -1856,7 +1856,7 @@ scan_configs = [(op, type, shape, axis, reverse, num_warps)
                 for axis in [1, 0]
                 for reverse in [True, False]
                 for shape in scan2d_shapes
-                for op in ['cumsum', 'cumprod', 'linear_recurrence', 'cummax', 'get_first_element']]
+                for op in ['cumsum', 'cumprod', 'get_first_element', 'linear_recurrence', 'cummax']]
 negative_config = [('cumsum', 'float32', (32, 32), -1, False, 4)]
 
 
