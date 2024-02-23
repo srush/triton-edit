@@ -524,7 +524,7 @@ ScanOpConversion::emitFastScan(triton::ScanOp op, triton::ScanOpAdaptor adaptor,
     AddPartialReduceOneWarp(srcValues, rewriter, helper, warpIdAxis, laneIdAxis,
                             laneIdLast);
   } // else axisNumWarps == 1 and srcValues.size() == 1, nothing to do.
-  
+
   auto transpose = [](const SmallVector<SmallVector<Value>> &v) {
     assert(v.size() > 0 && v[0].size() > 0);
     auto ret = SmallVector<SmallVector<Value>>(v[0].size(),
