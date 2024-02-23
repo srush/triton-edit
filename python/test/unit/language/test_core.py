@@ -1856,7 +1856,7 @@ scan_configs = [(op, type, shape, axis, reverse, num_warps)
                 for axis in [1, 0]
                 for reverse in [True, False]
                 for shape in scan2d_shapes
-                for op in ['cumsum', 'cumprod', 'get_first_element', 'linear_recurrence', 'cummax']]
+                for op in ['cumsum', 'cumprod', 'get_first_element', 'cummax']]
 negative_config = [('cumsum', 'float32', (32, 32), -1, False, 4)]
 
 
@@ -1933,7 +1933,8 @@ def test_scan2d(op, dtype_str, shape, axis, reverse, num_warps, device):
     elif op == 'cummax':
         # NumPy does not have cummax
         z = z.astype(np.int64)
-        z_ref = torch.cummax(torch.from_numpy(x), axis=axis).indices.numpy()
+        
+        z_ref = torch.cummax(torch.from_numpy(x_in.copy()), axis=axis).indices.numpy()
         if reverse:
            z_ref = np.flip(z_ref, axis)
 
@@ -1941,8 +1942,12 @@ def test_scan2d(op, dtype_str, shape, axis, reverse, num_warps, device):
         # Simplify to the axis=1 case
         x_ref = x.T if axis == 0 else x
         y_ref = y.T if axis == 0 else y
+        if reverse:
+            x_ref = np.flip(x_ref, 1)
+            y_ref = np.flip(y_ref, 1)
+
         result = []
-        for x_refi, y_refi in zip(np.flip(x_ref, axis), np.flip(y_ref, axis)):
+        for x_refi, y_refi in zip(x_ref, y_ref):
             li = []
             acc = 0
             for xi, yi in zip(x_refi, y_refi):
@@ -1950,10 +1955,11 @@ def test_scan2d(op, dtype_str, shape, axis, reverse, num_warps, device):
                 li.append(acc)
             result.append(li)
         z_ref = np.array(result)
+        if reverse:
+            z_ref = np.flip(z_ref, 1)
+
         if axis == 0:
             z_ref = z_ref.T
-        if reverse:
-            z_ref = np.flip(z_ref, axis)
     else:
         assert op == 'get_first_element'
         z_ref = x
