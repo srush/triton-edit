@@ -1895,17 +1895,22 @@ def test_scan2d(op, dtype_str, shape, axis, reverse, num_warps, device):
     if op == 'cumsum' or op == 'cumprod':
         kernel = patch_kernel(kernel, {'GENERATE_TEST_HERE': f'z = tl.{op}(x, axis={axis}, reverse={reverse})'})
     elif op == 'get_first_element':
-        kernel = patch_kernel(kernel,
-                              {'GENERATE_TEST_HERE': f'z = tl.associative_scan(x, axis={axis}, combine_fn={op}, reverse={reverse})'})
+        kernel = patch_kernel(
+            kernel,
+            {'GENERATE_TEST_HERE': f'z = tl.associative_scan(x, axis={axis}, combine_fn={op}, reverse={reverse})'})
     elif op == 'cummax':
         rg = "range_m[:, None]" if axis == 0 else "range_n[None, :]"
         rg = f"tl.broadcast_to({rg}.to(tl.int64), [BLOCK_M, BLOCK_N])"
-        kernel = patch_kernel(
-            kernel, {'GENERATE_TEST_HERE': f'_, z = tl.associative_scan((x, {rg}), axis={axis}, combine_fn={op}, reverse={reverse})'})
+        kernel = patch_kernel(kernel, {
+            'GENERATE_TEST_HERE':
+            f'_, z = tl.associative_scan((x, {rg}), axis={axis}, combine_fn={op}, reverse={reverse})'
+        })
     else:
         assert op == 'linear_recurrence'
-        kernel = patch_kernel(
-            kernel, {'GENERATE_TEST_HERE': f'_, z = tl.associative_scan((x, y), axis={axis}, combine_fn={op}, reverse={reverse})'})
+        kernel = patch_kernel(kernel, {
+            'GENERATE_TEST_HERE':
+            f'_, z = tl.associative_scan((x, y), axis={axis}, combine_fn={op}, reverse={reverse})'
+        })
     # input
     rs = RandomState(17)
     if op == 'linear_recurrence' and dtype_str in int_dtypes:
@@ -1928,14 +1933,14 @@ def test_scan2d(op, dtype_str, shape, axis, reverse, num_warps, device):
         z_dtype_str = dtype_str
         z_ref = numpy_op(x_in, axis=axis).astype(getattr(np, z_dtype_str))
         if reverse:
-           z_ref = np.flip(z_ref, axis)
+            z_ref = np.flip(z_ref, axis)
 
     elif op == 'cummax':
         # NumPy does not have cummax
         z = z.astype(np.int64)
         z_ref = torch.cummax(torch.from_numpy(x_in.copy()), axis=axis).indices.numpy()
         if reverse:
-           z_ref = x_in.shape[axis] - np.flip(z_ref, axis) - 1
+            z_ref = x_in.shape[axis] - np.flip(z_ref, axis) - 1
 
     elif op == 'linear_recurrence':
         # Simplify to the axis=1 case
