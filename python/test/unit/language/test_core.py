@@ -1889,7 +1889,7 @@ def test_scan2d(op, dtype_str, shape, axis, reverse, num_warps, device):
         range_n = tl.arange(0, BLOCK_N)
         x = tl.load(X + range_m[:, None] * BLOCK_N + range_n[None, :])
         y = tl.load(Y + range_m[:, None] * BLOCK_N + range_n[None, :])
-        GENERATE_TEST_HERE 
+        GENERATE_TEST_HERE
         tl.store(Z + range_m[:, None] * BLOCK_N + range_n[None, :], z)
 
     if op == 'cumsum' or op == 'cumprod':
@@ -1978,7 +1978,7 @@ def test_scan2d(op, dtype_str, shape, axis, reverse, num_warps, device):
     kernel[(1, )](x_tri, y_tri, z_tri, BLOCK_M=shape[0], BLOCK_N=shape[1], AXIS=axis, num_warps=num_warps)
     print(z_ref)
     print(z_tri)
-    
+
     z_tri = to_numpy(z_tri)
     # compare
     if dtype_str == 'float32':

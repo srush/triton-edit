@@ -449,12 +449,12 @@ flipSrcValues(Location loc, triton::ScanOp op,
                    int iWarpSize){
     SmallVector<SmallVector<Value>> values(srcValues.size());
     for (int i = 0; i < srcValues.size(); ++i) {
+        int revIndex = srcValues.size() - i - 1;
         for (unsigned j = 0; j < op.getNumOperands(); ++j) {
             for (unsigned k = iWarpSize / 2; k >= 1; k = k / 2){
-                auto value = shflSync(loc, rewriter, srcValues[srcValues.size() - i - 1][j], k);
-                srcValues[srcValues.size() - i - 1][j] = value;
+                srcValues[revIndex][j] = shflSync(loc, rewriter, srcValues[revIndex][j], k);
             }
-            values[i].push_back(srcValues[srcValues.size() - i - 1][j]);
+            values[i].push_back(srcValues[revIndex][j]);
         }
     }
     return values;
