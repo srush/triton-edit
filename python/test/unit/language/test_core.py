@@ -1942,7 +1942,7 @@ def test_scan2d(op, dtype_str, shape, axis, reverse, num_warps, device):
         x_ref = x.T if axis == 0 else x
         y_ref = y.T if axis == 0 else y
         result = []
-        for x_refi, y_refi in zip(x_ref, y_ref):
+        for x_refi, y_refi in zip(np.flip(x_ref, axis), np.flip(y_ref, axis)):
             li = []
             acc = 0
             for xi, yi in zip(x_refi, y_refi):
@@ -1952,6 +1952,8 @@ def test_scan2d(op, dtype_str, shape, axis, reverse, num_warps, device):
         z_ref = np.array(result)
         if axis == 0:
             z_ref = z_ref.T
+        if reverse:
+            z_ref = np.flip(z_ref, axis)
     else:
         assert op == 'get_first_element'
         z_ref = x
