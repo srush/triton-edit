@@ -656,8 +656,8 @@ llvm::SmallVector<Type> ReduceOp::getElementTypes() {
 unsigned ReduceOp::getNumOperands() { return this->getOperands().size(); }
 
 //-- ScanOp --
-void ScanOp::build(OpBuilder &builder, OperationState &state,
-                   ValueRange operands, int axis) {
+void ScanOp::build(mlir::OpBuilder &builder, mlir::OperationState &state,
+                   mlir::ValueRange operands, int axis, bool reverse) {
   SmallVector<Type> inferredReturnTypes;
   for (auto arg : operands)
     inferredReturnTypes.push_back(arg.getType());
